@@ -1,0 +1,9 @@
+{
+  "url": "https://github.com/STMicroelectronics/lsm6dsv-pid",
+  "commit": "a57294fe1444bf07458b7bbb64f7966eb4ca0050",
+  "files": {
+    "LICENSE": "b54f36a43cf9b8f6292c8f0f3b4c267ebd59859587e0152c94305bc81dda68bc",
+    "lsm6dsv_reg.c": "ecc36e96f81cda334106033a7efaafa7510106c4b9bc60f061a72bc094f8aa1a",
+    "lsm6dsv_reg.h": "dbdc42d7f0f11823e7ca091aebab62e15a9a084f908a3f7793cd2c8f321d718e"
+  }
+}

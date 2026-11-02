@@ -1,0 +1,2 @@
+# Real USB dashboard and finite hardware benchmark; Python 3.10+ on Linux.
+pyserial==3.5

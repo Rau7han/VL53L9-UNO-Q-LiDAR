@@ -1,0 +1,2579 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VL53L9 LiDAR + LSM6DSV IMU Dashboard</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #090d12;
+  --surface: #101620;
+  --panel: #141c28;
+  --panel-elevated: #1a2434;
+  --border: #233044;
+  --border-focus: #3b82f6;
+  --text: #f1f5f9;
+  --text-muted: #8b9bb4;
+  --accent: #06b6d4;
+  --green: #10b981;
+  --green-glow: rgba(16, 185, 129, 0.25);
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --purple: #a855f7;
+  --x: #f87171;
+  --y: #4ade80;
+  --z: #60a5fa;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* Header & Top Bar */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(8px);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.logo-badge {
+  background: linear-gradient(135deg, #0284c7, #6366f1);
+  color: #fff;
+  font-weight: 800;
+  font-size: 12px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  box-shadow: 0 0 12px rgba(2, 132, 199, 0.4);
+}
+
+.title-group h1 {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title-group .sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* Quick Telemetry Chips */
+.telemetry-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chip {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chip strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.chip .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  display: inline-block;
+  transition: all 0.2s ease;
+}
+
+.chip .status-dot.live {
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: pulse 2s infinite;
+}
+
+.chip .status-dot.warn { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+.chip .status-dot.error { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+@keyframes pulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* Header Action Buttons */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+button, .btn {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+button:hover, .btn:hover {
+  background: var(--panel-elevated);
+  border-color: #3b4e6b;
+  color: #fff;
+}
+
+button:active, .btn:active {
+  transform: translateY(1px);
+}
+
+button.primary {
+  background: #0284c7;
+  border-color: #0369a1;
+  color: #fff;
+}
+
+button.primary:hover {
+  background: #0ea5e9;
+  border-color: #0284c7;
+  box-shadow: 0 0 12px rgba(14, 165, 233, 0.4);
+}
+
+button:disabled, .btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Main Dashboard Workspace */
+main {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 18px 24px 36px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(380px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-header {
+  padding: 12px 18px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.panel-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-title svg {
+  color: var(--accent);
+}
+
+/* View Selector Tabs */
+.view-tabs {
+  display: flex;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.view-tab {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.view-tab:hover {
+  color: var(--text);
+}
+
+.view-tab.active {
+  background: var(--panel-elevated);
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+
+/* Toolbar Controls */
+.toolbar {
+  padding: 10px 18px;
+  background: rgba(16, 22, 32, 0.6);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tool-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+select {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  outline: none;
+}
+
+select:focus {
+  border-color: var(--border-focus);
+}
+
+.toggle-btn {
+  padding: 4px 9px;
+  font-size: 11.5px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-muted);
+}
+
+.toggle-btn.active {
+  background: var(--panel-elevated);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Visualization Viewport */
+.viewport-container {
+  position: relative;
+  background: #05070a;
+  aspect-ratio: 54 / 42;
+  min-height: 380px;
+  max-height: 580px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+
+#map2d {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: crosshair;
+}
+
+#viewport3d {
+  width: 100%;
+  height: 100%;
+  display: none;
+  cursor: grab;
+}
+
+#viewport3d:active {
+  cursor: grabbing;
+}
+
+#radarCanvas {
+  width: 100%;
+  height: 100%;
+  display: none;
+}
+
+/* Center Boresight Reticle Overlay */
+.reticle-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  opacity: 0.85;
+}
+
+.reticle-cross {
+  width: 24px;
+  height: 24px;
+  position: relative;
+}
+
+.reticle-cross::before, .reticle-cross::after {
+  content: '';
+  position: absolute;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.reticle-cross::before {
+  top: 11px; left: 0; right: 0; height: 2px;
+}
+
+.reticle-cross::after {
+  left: 11px; top: 0; bottom: 0; width: 2px;
+}
+
+.reticle-val {
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: #fff;
+  white-space: nowrap;
+}
+
+/* 3D View HUD Controls */
+.view3d-hud {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  background: rgba(16, 22, 32, 0.9);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: none;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.view3d-hud input[type="range"] {
+  width: 72px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.view3d-hud select {
+  padding: 3px 6px;
+  font-size: 11px;
+}
+
+.cloud-legend {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: none;
+  flex-direction: column;
+  gap: 3px;
+  background: rgba(8, 12, 18, 0.78);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  pointer-events: none;
+  line-height: 1.45;
+}
+
+.cloud-legend b { color: var(--text); font-weight: 600; }
+.cloud-legend .ax { font-weight: 700; }
+.cloud-legend .ax.x { color: var(--x); }
+.cloud-legend .ax.y { color: var(--y); }
+.cloud-legend .ax.z { color: var(--z); }
+
+.pose-toast {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(2, 132, 199, 0.92);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  display: none;
+  pointer-events: none;
+  z-index: 3;
+  white-space: nowrap;
+}
+
+.zero-chip.set {
+  border-color: #0369a1;
+  color: #7dd3fc;
+}
+
+/* Legend & Color Ramp */
+.legend-bar {
+  padding: 10px 18px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.ramp-track {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Live Stats Summary Strip */
+.stats-strip {
+  padding: 10px 18px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  text-align: center;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+
+.stat-val {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Pixel Inspector HUD */
+.inspector-hud {
+  padding: 11px 18px;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #cbd5e1;
+  min-height: 44px;
+}
+
+.inspector-data {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.inspector-tag {
+  color: var(--text-muted);
+}
+
+.inspector-val {
+  color: #fff;
+  font-weight: 600;
+}
+
+/* IMU & Flight Instrument Panel */
+.imu-grid {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 16px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+
+/* Attitude Horizon Gauge */
+.horizon-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+#horizonCanvas {
+  width: 146px;
+  height: 146px;
+  border-radius: 50%;
+  border: 2px solid #334155;
+  box-shadow: 0 0 16px rgba(0, 0, 0, 0.6), inset 0 0 10px rgba(0,0,0,0.5);
+  background: #0f172a;
+}
+
+.horizon-readout {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.horizon-readout strong {
+  color: #fff;
+}
+
+.horizon-readout .abs {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  color: #64748b;
+}
+
+/* IMU Metric Cards */
+.imu-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.metric-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-card .title {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.metric-card .value {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+}
+
+/* Axis Tables with Level Gauges */
+.axis-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.axis-table tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.axis-table td {
+  padding: 5px 4px;
+  vertical-align: middle;
+}
+
+.axis-table .axis-name {
+  font-weight: 700;
+  width: 18px;
+}
+
+.axis-table .axis-name.x { color: var(--x); }
+.axis-table .axis-name.y { color: var(--y); }
+.axis-table .axis-name.z { color: var(--z); }
+
+.axis-table .axis-num {
+  text-align: right;
+  width: 65px;
+  font-variant-numeric: tabular-nums;
+}
+
+.axis-bar-wrap {
+  padding-left: 8px;
+}
+
+.axis-bar-track {
+  width: 100%;
+  height: 6px;
+  background: #1e293b;
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+
+.axis-bar-center {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #475569;
+}
+
+.axis-bar-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+  transition: width 0.05s ease, left 0.05s ease;
+}
+
+.axis-bar-fill.x { background: var(--x); }
+.axis-bar-fill.y { background: var(--y); }
+.axis-bar-fill.z { background: var(--z); }
+
+/* Rolling Strip Charts */
+.charts-container {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chart-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.chart-legend {
+  display: flex;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+.chart-legend span.x { color: var(--x); }
+.chart-legend span.y { color: var(--y); }
+.chart-legend span.z { color: var(--z); }
+
+canvas.plot-canvas {
+  width: 100%;
+  height: 90px;
+  background: #080c12;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: block;
+}
+
+/* Collapsible Diagnostics Section */
+details {
+  grid-column: 1 / -1;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+details[open] {
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
+}
+
+summary {
+  padding: 14px 18px;
+  background: var(--surface);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+
+summary:hover {
+  background: var(--panel-elevated);
+}
+
+.diag-content {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.diag-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.diag-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.diag-card .lbl {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.diag-card .val {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: #fff;
+  word-break: break-all;
+}
+
+.diag-raw-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+pre.code-block {
+  background: #06090e;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #94a3b8;
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1080px) {
+  main {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+  .diag-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .telemetry-chips {
+    overflow-x: auto;
+  }
+  .imu-grid {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+  .stats-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .diag-raw-row {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo-badge">LiDAR · 3D</div>
+    <div class="title-group">
+      <h1>VL53L9CX ToF <span>&amp; LSM6DSV IMU</span></h1>
+      <div class="sub">54 × 42 Raw Frame Depth Streamer · Native USB CDC</div>
+    </div>
+  </div>
+
+  <div class="telemetry-chips">
+    <div class="chip">
+      <span class="status-dot" id="state-dot"></span>
+      <span id="state-text">Connecting…</span>
+    </div>
+    <div class="chip">
+      <span>FPS</span>
+      <strong id="chip-fps">—</strong>
+    </div>
+    <div class="chip">
+      <span>Capture</span>
+      <strong id="chip-exp">247 ms</strong>
+    </div>
+    <div class="chip">
+      <span>Port</span>
+      <strong id="chip-port">USB CDC</strong>
+    </div>
+    <div class="chip">
+      <span>Frames</span>
+      <strong id="chip-frames">0</strong>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button id="btn-toggle" disabled title="Shortcut: Spacebar">Pause</button>
+    <button id="btn-snapshot" title="Save high-resolution image of current view">Snapshot PNG</button>
+    <a class="btn" href="/download/frame.json" download="lidar-frame.json" title="Download latest frame in JSON format">JSON</a>
+    <a class="btn" href="/download/frame.bin" download="lidar-frame.bin" title="Download raw unmodified binary payload">Binary</a>
+  </div>
+</header>
+
+<main>
+  <!-- LiDAR Visualization Panel -->
+  <section class="panel">
+    <div class="panel-header">
+      <div class="panel-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path>
+          <path d="M2 12h20"></path>
+        </svg>
+        <span id="view-title">2D Depth Heatmap</span>
+      </div>
+
+      <div class="view-tabs">
+        <button class="view-tab active" data-view="2d" id="tab-2d">2D Heatmap</button>
+        <button class="view-tab" data-view="3d" id="tab-3d">3D Point Cloud</button>
+        <button class="view-tab" data-view="radar" id="tab-radar">Top-Down Radar</button>
+      </div>
+    </div>
+
+    <div id="processing-note" style="padding:8px 18px;color:#fbbf24;font-size:12px" role="status">Waiting for sensor calibration status…</div>
+    <!-- Toolbar controls -->
+    <div class="toolbar">
+      <div class="tool-group">
+        <span class="tool-label">Channel</span>
+        <select id="channel-sel">
+          <option value="depth_values" selected>Depth (perpendicular)</option>
+          <option value="amplitude">Signal Image (Amplitude)</option>
+          <option value="ambient">Raw ambient</option>
+          <option value="snr">Raw amplitude / ambient ratio</option>
+          <option value="flags">Depth + Main/Short Flag</option>
+          <option value="amplitude_raw">Raw Hardware Amplitude</option>
+        </select>
+      </div>
+
+      <div class="tool-group">
+        <span class="tool-label">Palette</span>
+        <select id="colormap-sel">
+          <option value="turbo" selected>Turbo (Google Rainbow)</option>
+          <option value="viridis">Viridis (Perceptual)</option>
+          <option value="plasma">Plasma (High-Contrast)</option>
+          <option value="magma">Magma (Gold/Purple)</option>
+          <option value="thermal">Thermal / Jet</option>
+          <option value="grayscale">Grayscale / Mono</option>
+          <option value="raw">Hardware Spectrum</option>
+        </select>
+      </div>
+
+      <div class="tool-group">
+        <span class="tool-label">Scale</span>
+        <select id="scale-sel">
+          <option value="auto">Auto Contrast (2%–98%)</option>
+          <option value="fixed" selected>Fixed Range (0–4000 mm)</option>
+          <option value="full">Raw Unclipped (0–65535)</option>
+        </select>
+      </div>
+
+      <div class="tool-group">
+        <button class="toggle-btn" id="btn-smooth" title="Toggle bilinear filtering vs crisp pixelated">Smooth</button>
+        <button class="toggle-btn active" id="btn-reticle" title="Toggle center boresight target reticle">Reticle</button>
+      </div>
+    </div>
+
+    <!-- Viewport -->
+    <div class="viewport-container" id="viewport-wrap">
+      <!-- 2D Canvas View -->
+      <canvas id="map2d" width="54" height="42"></canvas>
+
+      <!-- 3D WebGL Point Cloud Canvas -->
+      <canvas id="viewport3d"></canvas>
+
+      <!-- Top-Down Radar Canvas -->
+      <canvas id="radarCanvas"></canvas>
+
+      <!-- Center Boresight Reticle -->
+      <div class="reticle-overlay" id="reticle-overlay">
+        <div class="reticle-cross"></div>
+        <div class="reticle-val" id="reticle-val">— mm</div>
+      </div>
+
+      <div class="cloud-legend" id="cloud-legend">
+        <div><b id="cloud-count">0 points</b> · <span id="cloud-range">—</span></div>
+        <div><span class="ax x">X</span> right · <span class="ax y">Y</span> up · <span class="ax z">Z</span> forward</div>
+        <div id="cloud-lock-note">Drag to orbit · scroll to zoom · shift-drag to pan</div>
+      </div>
+      <div class="pose-toast" id="pose-toast">Start pose set</div>
+
+      <!-- 3D View HUD Controls -->
+      <div class="view3d-hud" id="hud3d">
+        <span>Size <input type="range" id="slider-pt-size" min="2" max="24" value="12"></span>
+        <span>Color
+          <select id="cloud-color" title="How points are colored">
+            <option value="depth" selected>Depth</option>
+            <option value="height">Height</option>
+            <option value="signal">Signal</option>
+          </select>
+        </span>
+        <button id="btn-cloud-level" class="toggle-btn" title="Relative IMU view; yaw drifts and translation is not tracked">IMU lock</button>
+        <button id="btn-cloud-accum" class="toggle-btn" title="Retain earlier points; moving objects leave trails and IMU does not track translation">Accumulate</button>
+        <button id="btn-cloud-grid" class="toggle-btn active">Grid</button>
+        <button id="btn-cloud-clear" title="Drop accumulated points">Clear cloud</button>
+        <button id="btn-rotate3d" class="toggle-btn">Auto-Orbit</button>
+        <button id="btn-reset3d" class="btn">Reset view</button>
+      </div>
+    </div>
+
+    <!-- Legend bar -->
+    <div class="legend-bar">
+      <span id="legend-min">0 mm</span>
+      <div class="ramp-track" id="ramp-track"></div>
+      <span id="legend-max">— mm</span>
+    </div>
+
+    <!-- Stats summary strip -->
+    <div class="stats-strip">
+      <div class="stat-item">
+        <span class="stat-label">Min Range</span>
+        <span class="stat-val" id="stat-min">—</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Max Range</span>
+        <span class="stat-val" id="stat-max">—</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Average</span>
+        <span class="stat-val" id="stat-avg">—</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Shown Coverage</span>
+        <span class="stat-val" id="stat-valid">—</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Boresight (Center)</span>
+        <span class="stat-val" id="stat-center">—</span>
+      </div>
+    </div>
+
+    <!-- Pixel Inspector HUD -->
+    <div class="inspector-hud" id="inspector-hud">
+      <div class="inspector-data">
+        <div><span class="inspector-tag">Pixel: </span><span class="inspector-val" id="insp-coord">[27, 21] Center</span></div>
+        <div><span class="inspector-tag">Depth: </span><span class="inspector-val" id="insp-depth">—</span></div>
+        <div><span class="inspector-tag">Amplitude: </span><span class="inspector-val" id="insp-amp">—</span></div>
+        <div><span class="inspector-tag">Ambient: </span><span class="inspector-val" id="insp-amb">—</span></div>
+        <div><span class="inspector-tag">Flag: </span><span class="inspector-val" id="insp-flag">—</span></div>
+      </div>
+      <span style="font-size: 11px; color: var(--text-muted);">Hover or tap to inspect</span>
+    </div>
+  </section>
+
+  <!-- IMU & Motion Telemetry Panel -->
+  <section class="panel">
+    <div class="panel-header">
+      <div class="panel-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+        </svg>
+        <span>LSM6DSV Motion Telemetry</span>
+      </div>
+      <span class="chip" style="font-size: 10.5px;" id="imu-status-chip">Waiting for IMU</span>
+    </div>
+
+    <div class="toolbar" id="imu-toolbar">
+      <div class="tool-group">
+        <span class="tool-label">Hat orientation</span>
+        <select id="imu-mount" title="How the IMU board is mounted. Axes are remapped before roll, pitch, and yaw.">
+          <option value="z-up">Flat · Z up</option>
+          <option value="z-down">Flipped · Z down</option>
+          <option value="x-up">Edge · X up</option>
+          <option value="x-down">Edge · X down</option>
+          <option value="y-up">Edge · Y up</option>
+          <option value="y-down">Edge · Y down</option>
+          <option value="yaw90">Flat · turned 90°</option>
+          <option value="yaw180">Flat · turned 180°</option>
+          <option value="yaw270">Flat · turned 270°</option>
+        </select>
+      </div>
+      <div class="tool-group">
+        <button id="btn-imu-zero" class="primary" title="The pose at the moment you click becomes roll 0°, pitch 0°, and yaw 0°. The point cloud starts from this pose.">Set start pose</button>
+        <button id="btn-imu-clear-zero" title="Show absolute orientation again">Clear zero</button>
+      </div>
+      <span class="chip" id="imu-zero-chip">Absolute pose</span>
+    </div>
+
+    <!-- Flight Attitude Horizon & Key Metrics -->
+    <div class="imu-grid">
+      <div class="horizon-wrap">
+        <canvas id="horizonCanvas" width="292" height="292"></canvas>
+        <div class="horizon-readout">
+          Roll <strong id="val-roll">0.0°</strong> · Pitch <strong id="val-pitch">0.0°</strong> · Yaw <strong id="val-yaw">0.0°</strong>
+          <span class="abs" id="imu-abs-readout">Sensor — · — · —</span>
+        </div>
+      </div>
+
+      <div class="imu-metrics">
+        <div class="metric-card">
+          <div class="title">Accelerometer</div>
+          <table class="axis-table">
+            <tr>
+              <td class="axis-name x">X</td>
+              <td class="axis-num" id="val-ax">—</td>
+              <td class="axis-bar-wrap"><div class="axis-bar-track"><div class="axis-bar-center"></div><div class="axis-bar-fill x" id="bar-ax"></div></div></td>
+            </tr>
+            <tr>
+              <td class="axis-name y">Y</td>
+              <td class="axis-num" id="val-ay">—</td>
+              <td class="axis-bar-wrap"><div class="axis-bar-track"><div class="axis-bar-center"></div><div class="axis-bar-fill y" id="bar-ay"></div></div></td>
+            </tr>
+            <tr>
+              <td class="axis-name z">Z</td>
+              <td class="axis-num" id="val-az">—</td>
+              <td class="axis-bar-wrap"><div class="axis-bar-track"><div class="axis-bar-center"></div><div class="axis-bar-fill z" id="bar-az"></div></div></td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="metric-card">
+          <div class="title">Gyroscope</div>
+          <table class="axis-table">
+            <tr>
+              <td class="axis-name x">X</td>
+              <td class="axis-num" id="val-gx">—</td>
+              <td class="axis-bar-wrap"><div class="axis-bar-track"><div class="axis-bar-center"></div><div class="axis-bar-fill x" id="bar-gx"></div></div></td>
+            </tr>
+            <tr>
+              <td class="axis-name y">Y</td>
+              <td class="axis-num" id="val-gy">—</td>
+              <td class="axis-bar-wrap"><div class="axis-bar-track"><div class="axis-bar-center"></div><div class="axis-bar-fill y" id="bar-gy"></div></div></td>
+            </tr>
+            <tr>
+              <td class="axis-name z">Z</td>
+              <td class="axis-num" id="val-gz">—</td>
+              <td class="axis-bar-wrap"><div class="axis-bar-track"><div class="axis-bar-center"></div><div class="axis-bar-fill z" id="bar-gz"></div></div></td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="metric-card">
+          <div class="title">Total Acceleration</div>
+          <div class="value" id="val-norm">— g</div>
+          <span style="font-size: 10.5px; color: var(--text-muted);">Stationary gravity = 1.000 g</span>
+        </div>
+
+        <div class="metric-card">
+          <div class="title">Sensor Temp</div>
+          <div class="value" id="val-temp">— °C</div>
+          <span style="font-size: 10.5px; color: var(--text-muted);" id="temp-stat">Die Temperature</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rolling Strip Charts -->
+    <div class="charts-container">
+      <div class="chart-box">
+        <div class="chart-header">
+          <span>Acceleration · body frame (±2.0 g)</span>
+          <div class="chart-legend"><span class="x">● Accel X</span> <span class="y">● Accel Y</span> <span class="z">● Accel Z</span></div>
+        </div>
+        <canvas class="plot-canvas" id="plot-accel"></canvas>
+      </div>
+
+      <div class="chart-box">
+        <div class="chart-header">
+          <span id="gyro-plot-label">Gyroscope History (±250 °/s)</span>
+          <div class="chart-legend"><span class="x">● Gyro X</span> <span class="y">● Gyro Y</span> <span class="z">● Gyro Z</span></div>
+        </div>
+        <canvas class="plot-canvas" id="plot-gyro"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- Diagnostics Drawer -->
+  <details>
+    <summary>
+      <span>Diagnostics, Error Flags &amp; Wire Protocol</span>
+      <span style="font-size: 11px; font-weight: 400; color: var(--text-muted);">Click to inspect raw frame internals</span>
+    </summary>
+    <div class="diag-content">
+      <div class="diag-grid">
+        <div class="diag-card">
+          <span class="lbl">Frame Sequence / Gaps</span>
+          <span class="val" id="diag-seq">—</span>
+        </div>
+        <div class="diag-card">
+          <span class="lbl">MCU Capture Time / Checksum</span>
+          <span class="val" id="diag-chk">—</span>
+        </div>
+        <div class="diag-card">
+          <span class="lbl">Hardware Error Code / Flags</span>
+          <span class="val" id="diag-err">—</span>
+        </div>
+        <div class="diag-card">
+          <span class="lbl">Automatic Recoveries</span>
+          <span class="val" id="diag-rec">0</span>
+        </div>
+      </div>
+
+      <div class="diag-raw-row">
+        <div>
+          <span class="lbl" style="display:block; margin-bottom: 6px;">Latest IMU Packet Raw</span>
+          <pre class="code-block" id="diag-imu-raw">Waiting for IMU samples…</pre>
+        </div>
+        <div>
+          <span class="lbl" style="display:block; margin-bottom: 6px;">Sensor Diagnostic Notes</span>
+          <pre class="code-block" id="diag-notes">Firmware: patch 0.17 ultra-low power 5 ms exposure.
+Payload: 14,842 bytes (54×42 depth, amplitude, ambient, packed DSS, and 100-byte status).
+FNV-1a checksum verified in MCU RAM prior to native USB CDC transfer.</pre>
+        </div>
+      </div>
+    </div>
+  </details>
+</main>
+
+<script>
+// --- State & Globals ---
+const $ = id => document.getElementById(id);
+let currentFrame = null;
+let currentSeq = null;
+let currentSession = null;
+let controlToken = null;
+let isStreaming = true;
+let currentError = null;
+let droppedGaps = 0;
+let lastFrameTime = 0;
+let lastIMUTime = 0;
+let lastIMUSeq = null;
+let imuHistory = [];
+let selectedPixel = [27, 21]; // Default center pixel
+let smoothScale = null;
+let activeView = '2d'; // '2d', '3d', 'radar'
+let isSmoothFilter = false;
+let showReticle = true;
+
+// --- Colormap Palettes ---
+const PALETTES = {
+  turbo: [
+    [48, 18, 59], [70, 134, 251], [27, 229, 181],
+    [164, 252, 60], [251, 185, 56], [227, 73, 24], [122, 4, 3]
+  ],
+  viridis: [
+    [68, 1, 84], [72, 35, 116], [64, 67, 135], [52, 94, 141],
+    [41, 120, 142], [32, 144, 140], [34, 167, 132], [68, 190, 112],
+    [121, 209, 81], [189, 222, 38], [253, 231, 37]
+  ],
+  plasma: [
+    [13, 8, 135], [84, 2, 163], [139, 10, 165], [185, 50, 137],
+    [219, 92, 104], [244, 136, 73], [254, 188, 43], [240, 249, 33]
+  ],
+  magma: [
+    [0, 0, 4], [40, 17, 74], [100, 26, 128], [160, 46, 110],
+    [211, 78, 64], [244, 136, 73], [252, 253, 191]
+  ],
+  thermal: [
+    [0, 0, 140], [0, 60, 255], [0, 220, 255],
+    [255, 255, 0], [255, 60, 0], [130, 0, 0]
+  ],
+  raw: [
+    [21, 20, 58], [35, 75, 133], [22, 141, 156], [90, 200, 145], [244, 232, 145]
+  ]
+};
+
+function samplePalette(stops, t) {
+  t = Math.max(0, Math.min(1, t));
+  const pos = t * (stops.length - 1);
+  const i = Math.floor(pos);
+  const f = pos - i;
+  if (i >= stops.length - 1) return stops[stops.length - 1];
+  return [
+    Math.round(stops[i][0] * (1 - f) + stops[i + 1][0] * f),
+    Math.round(stops[i][1] * (1 - f) + stops[i + 1][1] * f),
+    Math.round(stops[i][2] * (1 - f) + stops[i + 1][2] * f)
+  ];
+}
+
+function getRGB(value, low, high, paletteName) {
+  if (value === 0) return [10, 14, 20]; // Invalid/zero readings dark
+  const t = Math.max(0, Math.min(1, (value - low) / (high - low || 1)));
+  if (paletteName === 'grayscale') {
+    const l = Math.round(255 * Math.sqrt(t));
+    return [l, l, l];
+  }
+  const stops = PALETTES[paletteName] || PALETTES.turbo;
+  return samplePalette(stops, t);
+}
+
+function updateColorbar(paletteName) {
+  const ramp = $('ramp-track');
+  if (paletteName === 'grayscale') {
+    ramp.style.background = 'linear-gradient(90deg, #000, #fff)';
+    return;
+  }
+  const stops = PALETTES[paletteName] || PALETTES.turbo;
+  const gradientStops = stops.map((c, idx) => `rgb(${c[0]},${c[1]},${c[2]}) ${(idx / (stops.length - 1) * 100).toFixed(0)}%`);
+  ramp.style.background = `linear-gradient(90deg, ${gradientStops.join(', ')})`;
+}
+
+// --- View Switcher Tabs ---
+function switchView(view) {
+  activeView = view;
+  ['2d', '3d', 'radar'].forEach(v => {
+    $(`tab-${v}`).classList.toggle('active', v === view);
+  });
+  $('map2d').style.display = view === '2d' ? 'block' : 'none';
+  $('viewport3d').style.display = view === '3d' ? 'block' : 'none';
+  $('radarCanvas').style.display = view === 'radar' ? 'block' : 'none';
+  $('reticle-overlay').style.display = (view === '2d' && showReticle) ? 'flex' : 'none';
+  $('hud3d').style.display = view === '3d' ? 'flex' : 'none';
+  $('cloud-legend').style.display = view === '3d' ? 'flex' : 'none';
+
+  const titles = {
+    '2d': '2D Depth Heatmap',
+    '3d': '3D Interactive Point Cloud',
+    'radar': 'Top-Down Radar (Planar X-Z Projection)'
+  };
+  $('view-title').textContent = titles[view];
+  renderActiveView();
+}
+
+$('tab-2d').onclick = () => switchView('2d');
+$('tab-3d').onclick = () => switchView('3d');
+$('tab-radar').onclick = () => switchView('radar');
+
+// --- 2D Heatmap Rendering ---
+const mapCanvas = $('map2d');
+const mapCtx = mapCanvas.getContext('2d');
+
+function render2D(values, low, high, paletteName) {
+  const img = mapCtx.createImageData(54, 42);
+  const ch = $('channel-sel').value;
+  for (let i = 0; i < 54 * 42; i++) {
+    const v = values[i];
+    let rgb;
+    if (!Number.isFinite(v) || v <= 0) { rgb = [0,0,0]; }
+    else if (ch === 'flags') {
+      const isMain = currentFrame.depth_main_flags ? currentFrame.depth_main_flags[i] : false;
+      const t = Math.max(0, Math.min(1, (v - low) / (high - low || 1)));
+      rgb = isMain ? samplePalette(PALETTES.turbo, t) : [239, 68, 68]; // Red for short-window selection; not a validity or multi-target flag
+    } else {
+      rgb = getRGB(v, low, high, paletteName);
+    }
+    img.data[i * 4 + 0] = rgb[0];
+    img.data[i * 4 + 1] = rgb[1];
+    img.data[i * 4 + 2] = rgb[2];
+    img.data[i * 4 + 3] = 255;
+  }
+  mapCtx.putImageData(img, 0, 0);
+  mapCanvas.style.imageRendering = isSmoothFilter ? 'auto' : 'pixelated';
+}
+
+// --- Top-Down Radar View ---
+const radarCanvas = $('radarCanvas');
+const radarCtx = radarCanvas.getContext('2d');
+
+function renderRadar(depthValues, low, high, paletteName) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = radarCanvas.getBoundingClientRect();
+  const w = Math.round(rect.width * dpr);
+  const h = Math.round(rect.height * dpr);
+  if (radarCanvas.width !== w || radarCanvas.height !== h) {
+    radarCanvas.width = w;
+    radarCanvas.height = h;
+  }
+  radarCtx.clearRect(0, 0, w, h);
+  const locked = cloudLock;
+  const originX = w / 2;
+  const originY = locked ? h / 2 : h * 0.92;
+  const maxRangeM = 4.0;
+  const scale = ((locked ? Math.min(w, h) * 0.46 : h * 0.82)) / maxRangeM;
+  const heading = locked ? relYaw * Math.PI / 180 : 0;
+
+  radarCtx.lineWidth = 1 * dpr;
+  [1.0, 2.0, 3.0, 4.0].forEach(r => {
+    const radius = r * scale;
+    radarCtx.strokeStyle = '#1e293b';
+    radarCtx.beginPath();
+    if (locked) radarCtx.arc(originX, originY, radius, 0, 2 * Math.PI);
+    else radarCtx.arc(originX, originY, radius, Math.PI, 2 * Math.PI);
+    radarCtx.stroke();
+
+    radarCtx.fillStyle = '#64748b';
+    radarCtx.font = `${10 * dpr}px sans-serif`;
+    radarCtx.fillText(`${r}m`, originX + 4, originY - radius + 12 * dpr);
+  });
+
+  const angle = 30 * Math.PI / 180;
+  const reach = maxRangeM * scale;
+  radarCtx.strokeStyle = '#334155';
+  radarCtx.setLineDash([4 * dpr, 4 * dpr]);
+  radarCtx.beginPath();
+  [-angle, angle].forEach(offset => {
+    const a = heading + offset;
+    radarCtx.moveTo(originX, originY);
+    radarCtx.lineTo(originX + Math.sin(a) * reach, originY - Math.cos(a) * reach);
+  });
+  radarCtx.stroke();
+  radarCtx.setLineDash([]);
+
+  // Plot points in the start-pose frame when IMU lock is on.
+  for (let r = 0; r < 42; r++) {
+    for (let c = 0; c < 54; c++) {
+      const idx = r * 54 + c;
+      const d = depthValues[idx];
+      if (!Number.isFinite(d) || d <= 0) continue;
+      if (currentFrame.valid && !currentFrame.valid[idx]) continue;
+      const point = projectZone(c, r, d);
+      if (!point) continue;
+      let [x, y, z] = point;
+      if (cloudLock) [x, y, z] = levelPoint(x, y, z);
+      const px = originX + x * scale;
+      const py = originY - (-z) * scale;
+      if (py < 8 || px < 0 || px > w) continue;
+
+      const rgb = getRGB(d, low, high, paletteName);
+      radarCtx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+      radarCtx.beginPath();
+      radarCtx.arc(px, py, 2.2 * dpr, 0, 2 * Math.PI);
+      radarCtx.fill();
+    }
+  }
+
+  radarCtx.fillStyle = '#94a3b8';
+  radarCtx.font = `${11 * dpr}px sans-serif`;
+  radarCtx.fillText(cloudLock ? `Heading ${relYaw.toFixed(1)}°` : 'Sensor frame', 12 * dpr, 22 * dpr);
+
+  // Sensor origin marker
+  radarCtx.fillStyle = '#06b6d4';
+  radarCtx.beginPath();
+  radarCtx.arc(originX, originY, 4 * dpr, 0, 2 * Math.PI);
+  radarCtx.fill();
+}
+
+// --- 3D WebGL Point Cloud Renderer ---
+let gl = null;
+let glProgram = null;
+let glPosBuffer = null;
+let glColorBuffer = null;
+let glLinePos = null;
+let glLineColor = null;
+let lineVertexCount = 0;
+let ptSizeLocation = null;
+let matrixLocation = null;
+let orbitYaw = 0.55;
+let orbitPitch = 0.38;
+let orbitDistance = 2.6;
+let panX = 0;
+let panY = 0;
+let autoRotate3D = false;
+let is3DDragging = false;
+let dragPans = false;
+let lastMouseX = 0;
+let lastMouseY = 0;
+let cloudLock = false;
+let cloudAccum = false;
+let cloudGrid = true;
+let cloudMap = new Map();
+let lastCloudSeq = null;
+const CLOUD_MAX = 70000;
+const HFOV = 55 * Math.PI / 180;
+const VFOV = 42 * Math.PI / 180;
+const TAN_HALF_H = Math.tan(HFOV / 2);
+const TAN_HALF_V = Math.tan(VFOV / 2);
+
+function initWebGL() {
+  const canvas = $('viewport3d');
+  gl = canvas.getContext('webgl', { antialias: true, alpha: false, preserveDrawingBuffer: true });
+  if (!gl) return;
+
+  const vs = `
+    attribute vec3 a_position;
+    attribute vec3 a_color;
+    uniform mat4 u_matrix;
+    uniform float u_pointSize;
+    varying vec3 v_color;
+    void main() {
+      gl_Position = u_matrix * vec4(a_position, 1.0);
+      gl_PointSize = clamp(u_pointSize, 2.0, 40.0);
+      v_color = a_color;
+    }
+  `;
+  const fs = `
+    precision mediump float;
+    varying vec3 v_color;
+    uniform float u_isPoint;
+    void main() {
+      if (u_isPoint > 0.5) {
+        vec2 d = gl_PointCoord - vec2(0.5);
+        float r = length(d);
+        if (r > 0.5) discard;
+        float core = smoothstep(0.5, 0.12, r);
+        gl_FragColor = vec4(min(v_color * (0.85 + 0.45 * core), vec3(1.0)), 1.0);
+      } else {
+        gl_FragColor = vec4(v_color, 1.0);
+      }
+    }
+  `;
+
+  function createShader(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      console.error(gl.getShaderInfoLog(s));
+    }
+    return s;
+  }
+  const program = gl.createProgram();
+  gl.attachShader(program, createShader(gl.VERTEX_SHADER, vs));
+  gl.attachShader(program, createShader(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    console.error(gl.getProgramInfoLog(program));
+    return;
+  }
+  glProgram = program;
+
+  glPosBuffer = gl.createBuffer();
+  glColorBuffer = gl.createBuffer();
+  glLinePos = gl.createBuffer();
+  glLineColor = gl.createBuffer();
+  ptSizeLocation = gl.getUniformLocation(program, 'u_pointSize');
+  matrixLocation = gl.getUniformLocation(program, 'u_matrix');
+  buildSceneLines();
+
+  gl.enable(gl.DEPTH_TEST);
+  gl.clearColor(0.035, 0.05, 0.075, 1.0);
+
+  canvas.addEventListener('mousedown', e => {
+    is3DDragging = true;
+    dragPans = e.button === 2 || e.shiftKey;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+  });
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  window.addEventListener('mouseup', () => { is3DDragging = false; dragPans = false; });
+  canvas.addEventListener('mousemove', e => {
+    if (!is3DDragging) return;
+    const dx = e.clientX - lastMouseX;
+    const dy = e.clientY - lastMouseY;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+    if (dragPans) {
+      panX -= dx * 0.0022 * orbitDistance;
+      panY += dy * 0.0022 * orbitDistance;
+    } else {
+      orbitYaw -= dx * 0.008;
+      orbitPitch = Math.max(-1.35, Math.min(1.35, orbitPitch + dy * 0.008));
+    }
+    renderActiveView();
+  });
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    orbitDistance = Math.max(0.35, Math.min(14.0, orbitDistance + e.deltaY * 0.0025));
+    renderActiveView();
+  }, { passive: false });
+  canvas.addEventListener('dblclick', () => {
+    orbitYaw = 0.55;
+    orbitPitch = 0.38;
+    orbitDistance = 2.6;
+    panX = 0;
+    panY = 0;
+    renderActiveView();
+  });
+}
+
+function buildSceneLines() {
+  const pos = [];
+  const col = [];
+  const push = (x, y, z, r, g, b) => { pos.push(x, y, z); col.push(r, g, b); };
+  const seg = (x1, y1, z1, x2, y2, z2, r, g, b) => {
+    push(x1, y1, z1, r, g, b);
+    push(x2, y2, z2, r, g, b);
+  };
+  for (let i = -4; i <= 4; i += 0.5) {
+    const major = Math.abs(i) < 1e-6;
+    const c = major ? 0.28 : 0.14;
+    seg(i, 0, -4, i, 0, 4, c, c, c + 0.04);
+    seg(-4, 0, i, 4, 0, i, c, c, c + 0.04);
+  }
+  seg(0, 0, 0, 0.55, 0, 0, 0.97, 0.45, 0.45);
+  seg(0, 0, 0, 0, 0.55, 0, 0.29, 0.87, 0.5);
+  seg(0, 0, 0, 0, 0, -0.55, 0.38, 0.65, 0.98);
+  const reach = 0.85;
+  const corners = [
+    [TAN_HALF_H, TAN_HALF_V],
+    [-TAN_HALF_H, TAN_HALF_V],
+    [-TAN_HALF_H, -TAN_HALF_V],
+    [TAN_HALF_H, -TAN_HALF_V]
+  ];
+  corners.forEach(([xh, yh], i) => {
+    seg(0, 0, 0, xh * reach, yh * reach, -reach, 0.25, 0.55, 0.7);
+    const n = corners[(i + 1) % 4];
+    seg(xh * reach, yh * reach, -reach, n[0] * reach, n[1] * reach, -reach, 0.25, 0.55, 0.7);
+  });
+  lineVertexCount = pos.length / 3;
+  gl.bindBuffer(gl.ARRAY_BUFFER, glLinePos);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pos), gl.STATIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER, glLineColor);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(col), gl.STATIC_DRAW);
+}
+
+function depthPlane() {
+  return currentFrame.depth_mm || currentFrame.depth_values;
+}
+function projectZone(col, row, depthMm) {
+  const idx = row * currentFrame.width + col;
+  if (currentFrame.points_xyz_mm) {
+    const p = currentFrame.points_xyz_mm[idx];
+    return p ? [p[0]/1000, -p[1]/1000, -p[2]/1000] : null;
+  }
+  if (!Number.isFinite(depthMm) || depthMm <= 0) return null;
+  const u = ((col+.5)/currentFrame.width*2-1)*TAN_HALF_H;
+  const v = ((row+.5)/currentFrame.height*2-1)*TAN_HALF_V;
+  const z = depthMm/Math.hypot(u,v,1)/1000;
+  return [u*z, -v*z, -z];
+}
+
+function levelPoint(x, y, z) {
+  if (!cloudLock) return [x, y, z];
+  const yaw = relYaw * Math.PI / 180;
+  const pitch = relPitch * Math.PI / 180;
+  const roll = relRoll * Math.PI / 180;
+  const cr = Math.cos(-roll), sr = Math.sin(-roll);
+  const x1 = x * cr - y * sr;
+  const y1 = x * sr + y * cr;
+  const z1 = z;
+  const cp = Math.cos(-pitch), sp = Math.sin(-pitch);
+  const y2 = y1 * cp - z1 * sp;
+  const z2 = y1 * sp + z1 * cp;
+  const cy = Math.cos(-yaw), sy = Math.sin(-yaw);
+  return [x1 * cy + z2 * sy, y2, -x1 * sy + z2 * cy];
+}
+
+function clearCloud() {
+  cloudMap.clear();
+  lastCloudSeq = null;
+}
+
+function ingestCloud(depthValues, low, high, paletteName) {
+  if (!depthValues) return 0;
+  const colorMode = $('cloud-color').value;
+  const amps = currentFrame && currentFrame.amplitude;
+  let ampHi = 1;
+  if (amps && colorMode === 'signal') {
+    for (let i = 0; i < amps.length; i++) if (amps[i] > ampHi) ampHi = amps[i];
+  }
+  const fresh = !cloudAccum || lastCloudSeq !== currentSeq;
+  if (cloudAccum && !fresh) return cloudMap.size;
+  if (!cloudAccum) cloudMap.clear();
+
+  let near = Infinity, far = 0, kept = 0;
+  for (let r = 0; r < 42; r++) {
+    for (let c = 0; c < 54; c++) {
+      const idx = r * 54 + c;
+      const d = depthValues[idx];
+      if (!Number.isFinite(d) || d <= 0) continue;
+      if (currentFrame.valid && !currentFrame.valid[idx]) continue;
+      const amp = amps ? amps[idx] : 0;
+      const point = projectZone(c, r, d);
+      if (!point) continue;
+      let [x, y, z] = point;
+      [x, y, z] = levelPoint(x, y, z);
+      let rgb;
+      if (colorMode === 'height') rgb = getRGB((y + 0.4) * 1000, 0, 2200, paletteName);
+      else if (colorMode === 'signal') rgb = getRGB(amp, 0, ampHi, paletteName);
+      else rgb = getRGB(d, low, high, paletteName);
+      const dim = 1;
+      // Preserve each sensor pixel in a single frame. Voxel merging only bounds
+      // the optional accumulated history, which is not a measured resolution.
+      const key = cloudAccum ? `${Math.round(x / 0.02)}|${Math.round(y / 0.02)}|${Math.round(z / 0.02)}` : idx;
+      cloudMap.set(key, [x, y, z, rgb[0] / 255 * dim, rgb[1] / 255 * dim, rgb[2] / 255 * dim]);
+      if (d < near) near = d;
+      if (d > far) far = d;
+      kept++;
+    }
+  }
+  if (cloudAccum) {
+    while (cloudMap.size > CLOUD_MAX) {
+      const oldest = cloudMap.keys().next().value;
+      cloudMap.delete(oldest);
+    }
+    lastCloudSeq = currentSeq;
+  }
+  $('cloud-count').textContent = `${cloudMap.size.toLocaleString()} points`;
+  $('cloud-range').textContent = kept ? `${(near / 1000).toFixed(2)}–${(far / 1000).toFixed(2)} m` : 'no returns';
+  $('cloud-lock-note').textContent = cloudLock
+    ? (imuZero ? 'Locked to start pose · drag orbit · scroll zoom' : 'IMU lock on · set a start pose to zero the cloud')
+    : 'Sensor frame · drag orbit · scroll zoom · shift-drag pan';
+  return cloudMap.size;
+}
+
+function render3D(depthValues, low, high, paletteName) {
+  if (!gl || !glProgram) return;
+  const canvas = $('viewport3d');
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.round(canvas.clientWidth * dpr);
+  const h = Math.round(canvas.clientHeight * dpr);
+  if (w < 2 || h < 2) return;
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+    gl.viewport(0, 0, w, h);
+  }
+
+  ingestCloud(depthValues, low, high, paletteName);
+
+  const n = cloudMap.size;
+  const positions = new Float32Array(n * 3);
+  const colors = new Float32Array(n * 3);
+  let i = 0;
+  cloudMap.forEach(p => {
+    positions[i] = p[0]; colors[i] = p[3];
+    positions[i + 1] = p[1]; colors[i + 1] = p[4];
+    positions[i + 2] = p[2]; colors[i + 2] = p[5];
+    i += 3;
+  });
+
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.useProgram(glProgram);
+
+  const aspect = w / Math.max(1, h);
+  const fov = 42 * Math.PI / 180;
+  const near = 0.05, far = 40.0;
+  const f = 1.0 / Math.tan(fov / 2);
+  const proj = [
+    f / aspect, 0, 0, 0,
+    0, f, 0, 0,
+    0, 0, (far + near) / (near - far), -1,
+    0, 0, (2 * far * near) / (near - far), 0
+  ];
+
+  const cy = Math.cos(orbitYaw), sy = Math.sin(orbitYaw);
+  const cp = Math.cos(orbitPitch), sp = Math.sin(orbitPitch);
+  const target = [panX, panY, -1.15];
+  const eyeX = target[0] + orbitDistance * sy * cp;
+  const eyeY = target[1] + orbitDistance * sp;
+  const eyeZ = target[2] + orbitDistance * cy * cp;
+
+  const zAxis = normalize([eyeX - target[0], eyeY - target[1], eyeZ - target[2]]);
+  const xAxis = normalize(cross([0, 1, 0], zAxis));
+  const yAxis = cross(zAxis, xAxis);
+  const eye = [eyeX, eyeY, eyeZ];
+  const view = [
+    xAxis[0], yAxis[0], zAxis[0], 0,
+    xAxis[1], yAxis[1], zAxis[1], 0,
+    xAxis[2], yAxis[2], zAxis[2], 0,
+    -dot(xAxis, eye), -dot(yAxis, eye), -dot(zAxis, eye), 1
+  ];
+  gl.uniformMatrix4fv(matrixLocation, false, new Float32Array(multiplyMat4(proj, view)));
+
+  const posAttr = gl.getAttribLocation(glProgram, 'a_position');
+  const colAttr = gl.getAttribLocation(glProgram, 'a_color');
+  const pointFlag = gl.getUniformLocation(glProgram, 'u_isPoint');
+
+  // Points are drawn before the grid. On this WebGL driver a line draw
+  // poisons the next buffer, so the cloud has to go first.
+  gl.uniform1f(pointFlag, 1);
+  gl.uniform1f(ptSizeLocation, parseFloat($('slider-pt-size').value) * Math.max(1, dpr));
+  gl.bindBuffer(gl.ARRAY_BUFFER, glPosBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, positions, gl.DYNAMIC_DRAW);
+  gl.enableVertexAttribArray(posAttr);
+  gl.vertexAttribPointer(posAttr, 3, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, glColorBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, colors, gl.DYNAMIC_DRAW);
+  gl.enableVertexAttribArray(colAttr);
+  gl.vertexAttribPointer(colAttr, 3, gl.FLOAT, false, 0, 0);
+  if (n) gl.drawArrays(gl.POINTS, 0, n);
+
+  if (cloudGrid && lineVertexCount) {
+    gl.uniform1f(pointFlag, 0);
+    gl.uniform1f(ptSizeLocation, 1);
+    gl.bindBuffer(gl.ARRAY_BUFFER, glLinePos);
+    gl.vertexAttribPointer(posAttr, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, glLineColor);
+    gl.vertexAttribPointer(colAttr, 3, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.LINES, 0, lineVertexCount);
+  }
+}
+
+// Math helpers for 3D matrix
+function normalize(v) {
+  const len = Math.hypot(...v) || 1;
+  return [v[0] / len, v[1] / len, v[2] / len];
+}
+function cross(a, b) {
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+}
+function dot(a, b) {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+function multiplyMat4(a, b) {
+  const out = new Array(16);
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
+      out[i * 4 + j] =
+        a[0 * 4 + j] * b[i * 4 + 0] +
+        a[1 * 4 + j] * b[i * 4 + 1] +
+        a[2 * 4 + j] * b[i * 4 + 2] +
+        a[3 * 4 + j] * b[i * 4 + 3];
+    }
+  }
+  return out;
+}
+
+$('btn-reset3d').onclick = () => {
+  orbitYaw = 0.55;
+  orbitPitch = 0.38;
+  orbitDistance = 2.6;
+  panX = 0;
+  panY = 0;
+  renderActiveView();
+};
+
+$('btn-rotate3d').onclick = () => {
+  autoRotate3D = !autoRotate3D;
+  $('btn-rotate3d').classList.toggle('active', autoRotate3D);
+};
+
+$('btn-cloud-level').onclick = () => {
+  cloudLock = !cloudLock;
+  $('btn-cloud-level').classList.toggle('active', cloudLock);
+  clearCloud();
+  renderActiveView();
+};
+
+$('btn-cloud-accum').onclick = () => {
+  cloudAccum = !cloudAccum;
+  $('btn-cloud-accum').classList.toggle('active', cloudAccum);
+  clearCloud();
+  renderActiveView();
+};
+
+$('btn-cloud-grid').onclick = () => {
+  cloudGrid = !cloudGrid;
+  $('btn-cloud-grid').classList.toggle('active', cloudGrid);
+  renderActiveView();
+};
+
+$('btn-cloud-clear').onclick = () => {
+  clearCloud();
+  renderActiveView();
+};
+
+$('cloud-color').onchange = () => {
+  clearCloud();
+  renderActiveView();
+};
+
+// --- Flight Attitude Horizon Canvas ---
+const horizonCanvas = $('horizonCanvas');
+const horizonCtx = horizonCanvas.getContext('2d');
+
+function drawHorizon(rollDeg, pitchDeg) {
+  const w = horizonCanvas.width;
+  const h = horizonCanvas.height;
+  const cx = w / 2;
+  const cy = h / 2;
+  const radius = w * 0.46;
+
+  horizonCtx.clearRect(0, 0, w, h);
+  horizonCtx.save();
+
+  // Circular Clipping
+  horizonCtx.beginPath();
+  horizonCtx.arc(cx, cy, radius, 0, 2 * Math.PI);
+  horizonCtx.clip();
+
+  // Rotate for Roll and Translate for Pitch
+  horizonCtx.translate(cx, cy);
+  horizonCtx.rotate(-rollDeg * Math.PI / 180);
+  const pxPerDeg = radius / 40.0;
+  const pitchOffset = Math.max(-radius, Math.min(radius, pitchDeg * pxPerDeg));
+  horizonCtx.translate(0, pitchOffset);
+
+  // Sky
+  const skyGrad = horizonCtx.createLinearGradient(0, -radius * 2, 0, 0);
+  skyGrad.addColorStop(0, '#1e3a8a');
+  skyGrad.addColorStop(1, '#38bdf8');
+  horizonCtx.fillStyle = skyGrad;
+  horizonCtx.fillRect(-radius * 2, -radius * 2, radius * 4, radius * 2);
+
+  // Ground
+  const groundGrad = horizonCtx.createLinearGradient(0, 0, 0, radius * 2);
+  groundGrad.addColorStop(0, '#78350f');
+  groundGrad.addColorStop(1, '#451a03');
+  horizonCtx.fillStyle = groundGrad;
+  horizonCtx.fillRect(-radius * 2, 0, radius * 4, radius * 2);
+
+  // Horizon Line
+  horizonCtx.strokeStyle = '#ffffff';
+  horizonCtx.lineWidth = 3;
+  horizonCtx.beginPath();
+  horizonCtx.moveTo(-radius * 2, 0);
+  horizonCtx.lineTo(radius * 2, 0);
+  horizonCtx.stroke();
+
+  // Pitch Ladder Rungs (±10°, ±20°)
+  horizonCtx.lineWidth = 2;
+  horizonCtx.font = '10px var(--font-mono)';
+  horizonCtx.fillStyle = '#fff';
+  horizonCtx.textAlign = 'center';
+  horizonCtx.textBaseline = 'middle';
+
+  [-20, -10, 10, 20].forEach(deg => {
+    const y = -deg * pxPerDeg;
+    const rungWidth = 36;
+    horizonCtx.beginPath();
+    horizonCtx.moveTo(-rungWidth / 2, y);
+    horizonCtx.lineTo(rungWidth / 2, y);
+    horizonCtx.stroke();
+    horizonCtx.fillText(`${Math.abs(deg)}`, rungWidth / 2 + 12, y);
+    horizonCtx.fillText(`${Math.abs(deg)}`, -rungWidth / 2 - 12, y);
+  });
+
+  horizonCtx.restore();
+
+  // Fixed Aircraft Boresight Symbol (Yellow)
+  horizonCtx.strokeStyle = '#facc15';
+  horizonCtx.lineWidth = 4;
+  horizonCtx.beginPath();
+  horizonCtx.moveTo(cx - 30, cy);
+  horizonCtx.lineTo(cx - 10, cy);
+  horizonCtx.lineTo(cx, cy + 8);
+  horizonCtx.lineTo(cx + 10, cy);
+  horizonCtx.lineTo(cx + 30, cy);
+  horizonCtx.stroke();
+
+  horizonCtx.fillStyle = '#facc15';
+  horizonCtx.beginPath();
+  horizonCtx.arc(cx, cy, 3, 0, 2 * Math.PI);
+  horizonCtx.fill();
+
+  // Fixed bank index at the top. The horizon itself carries the roll.
+  horizonCtx.fillStyle = '#f8fafc';
+  horizonCtx.beginPath();
+  horizonCtx.moveTo(cx, cy - radius + 6);
+  horizonCtx.lineTo(cx - 7, cy - radius + 18);
+  horizonCtx.lineTo(cx + 7, cy - radius + 18);
+  horizonCtx.closePath();
+  horizonCtx.fill();
+
+  horizonCtx.strokeStyle = '#cbd5e1';
+  horizonCtx.lineWidth = 2;
+  [-30, -20, -10, 10, 20, 30].forEach(deg => {
+    const a = (deg - 90) * Math.PI / 180;
+    horizonCtx.beginPath();
+    horizonCtx.moveTo(cx + Math.cos(a) * (radius - 4), cy + Math.sin(a) * (radius - 4));
+    horizonCtx.lineTo(cx + Math.cos(a) * (radius - 14), cy + Math.sin(a) * (radius - 14));
+    horizonCtx.stroke();
+  });
+}
+
+// --- Rolling Strip Charts ---
+function drawPlot(canvasId, historyKey, range, isGyro = false) {
+  const c = $(canvasId);
+  const dpr = window.devicePixelRatio || 1;
+  const rect = c.getBoundingClientRect();
+  const w = Math.round(rect.width * dpr);
+  const h = Math.round(rect.height * dpr);
+  if (c.width !== w || c.height !== h) {
+    c.width = w;
+    c.height = h;
+  }
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+
+  // Center Zero Grid Line
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 1 * dpr;
+  ctx.beginPath();
+  ctx.moveTo(0, h / 2);
+  ctx.lineTo(w, h / 2);
+  ctx.stroke();
+
+  if (imuHistory.length < 2) return;
+  const now = imuHistory.at(-1).timestamp_ms;
+  const colors = ['#f87171', '#4ade80', '#60a5fa'];
+
+  colors.forEach((col, axis) => {
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.5 * dpr;
+    ctx.beginPath();
+    let started = false;
+    imuHistory.forEach(s => {
+      const dt = now - s.timestamp_ms;
+      if (dt > 8000) return;
+      const x = w * (1 - dt / 8000);
+      const val = s[historyKey][axis];
+      const y = h / 2 - (val / range) * (h * 0.44);
+      if (!started) {
+        ctx.moveTo(x, y);
+        started = true;
+      } else {
+        ctx.lineTo(x, y);
+      }
+    });
+    ctx.stroke();
+  });
+}
+
+// --- Main Render Pipeline ---
+function renderActiveView() {
+  if (!currentFrame) return;
+  const ch = $('channel-sel').value;
+  const pal = $('colormap-sel').value;
+  const scaleMode = $('scale-sel').value;
+
+  // Extract channel array
+  let values;
+  if (ch === 'amplitude') values = currentFrame.amplitude;
+  else if (ch === 'ambient') values = currentFrame.ambient;
+  else if (ch === 'snr') {
+    values = currentFrame.amplitude.map((a, i) => Math.round((a / (currentFrame.ambient[i] + 1)) * 10));
+  } else if (ch === 'amplitude_raw') values = currentFrame.amplitude;
+  else values = depthPlane();
+
+  if (!values) return;
+
+  // Compute contrast bounds
+  let low = 0, high = 4000;
+  if (scaleMode === 'full') {
+    low = 0; high = 65535;
+  } else if (scaleMode === 'fixed') {
+    low = 0; high = (ch === 'amplitude' || ch === 'amplitude_raw') ? 4096 : 4000;
+  } else {
+    // Auto dynamic contrast with 2%–98% percentile clipping
+    const sorted = values.filter(v => v > 0).sort((a, b) => a - b);
+    if (sorted.length > 10) {
+      const pLow = sorted[Math.floor(sorted.length * 0.02)];
+      const pHigh = sorted[Math.floor(sorted.length * 0.98)];
+      low = pLow;
+      high = Math.max(low + 50, pHigh);
+    } else {
+      low = 0; high = 4000;
+    }
+    // Temporal smoothing of scale range
+    if (smoothScale) {
+      low = Math.round(smoothScale[0] * 0.8 + low * 0.2);
+      high = Math.round(smoothScale[1] * 0.8 + high * 0.2);
+    }
+    smoothScale = [low, high];
+  }
+
+  // Update Legend Bar
+  $('legend-min').textContent = `${low} ${ch === 'depth_values' ? 'mm' : ''}`;
+  $('legend-max').textContent = `${high} ${ch === 'depth_values' ? 'mm' : ''}`;
+  updateColorbar(pal);
+
+  // Compute Summary Statistics
+  const validVals = depthPlane().filter(v => Number.isFinite(v) && v > 0);
+  const minVal = validVals.length ? Math.min(...validVals) : 0;
+  const maxVal = validVals.length ? Math.max(...validVals) : 0;
+  const avgVal = validVals.length ? Math.round(validVals.reduce((a, b) => a + b, 0) / validVals.length) : 0;
+  const coverage = ((validVals.length / (54 * 42)) * 100).toFixed(1);
+  const centerIdx = 21 * 54 + 27;
+  const centerVal = depthPlane()[centerIdx];
+  const centerText = Number.isFinite(centerVal) ? `${Math.round(centerVal)} mm` : "Invalid";
+
+  $('stat-min').textContent = `${Math.round(minVal)} mm`;
+  $('stat-max').textContent = `${Math.round(maxVal)} mm`;
+  $('stat-avg').textContent = `${avgVal} mm`;
+  $('stat-valid').textContent = `${coverage}% (${validVals.length}/2268)`;
+  $('stat-center').textContent = centerText;
+  $('reticle-val').textContent = centerText;
+
+  // Render Target View
+  if (activeView === '2d') {
+    render2D(values, low, high, pal);
+  } else if (activeView === '3d') {
+    render3D(depthPlane(), ch === 'depth_values' ? low : 0, ch === 'depth_values' ? high : 4000, pal);
+  } else if (activeView === 'radar') {
+    renderRadar(depthPlane(), ch === 'depth_values' ? low : 0, ch === 'depth_values' ? high : 4000, pal);
+  }
+
+  updateInspector();
+}
+
+// --- Inspector Tooltip & Hover ---
+function updateInspector() {
+  if (!currentFrame || !selectedPixel) return;
+  const [col, row] = selectedPixel;
+  const idx = row * 54 + col;
+  const depth = depthPlane()[idx];
+  const amp = currentFrame.amplitude ? currentFrame.amplitude[idx] : '—';
+  const amb = currentFrame.ambient ? currentFrame.ambient[idx] : '—';
+  const flag = currentFrame.depth_main_flags ? (currentFrame.depth_main_flags[idx] ? 'Main Window' : 'Short Window') : '—';
+
+  $('insp-coord').textContent = `[${col}, ${row}]`;
+  $('insp-depth').textContent = Number.isFinite(depth) ? `${Math.round(depth)} mm (${(depth/1000).toFixed(2)} m)` : "Invalid / filtered";
+  $('insp-amp').textContent = `${amp}`;
+  $('insp-amb').textContent = `${amb}`;
+  $('insp-flag').textContent = `${flag}`;
+}
+
+mapCanvas.addEventListener('pointermove', e => {
+  const r = mapCanvas.getBoundingClientRect();
+  const c = Math.max(0, Math.min(53, Math.floor((e.clientX - r.left) / r.width * 54)));
+  const row = Math.max(0, Math.min(41, Math.floor((e.clientY - r.top) / r.height * 42)));
+  selectedPixel = [c, row];
+  updateInspector();
+});
+
+// --- IMU hat orientation, start pose, and attitude ---
+const IMU_MOUNTS = {
+  'z-up':   [1, 0, 0,  0, 1, 0,  0, 0, 1],
+  'z-down': [1, 0, 0,  0,-1, 0,  0, 0,-1],
+  'x-up':   [0, 0,-1,  0, 1, 0,  1, 0, 0],
+  'x-down': [0, 0, 1,  0, 1, 0, -1, 0, 0],
+  'y-up':   [1, 0, 0,  0, 0,-1,  0, 1, 0],
+  'y-down': [1, 0, 0,  0, 0, 1,  0,-1, 0],
+  'yaw90':  [0,-1, 0,  1, 0, 0,  0, 0, 1],
+  'yaw180': [-1,0, 0,  0,-1, 0,  0, 0, 1],
+  'yaw270': [0, 1, 0, -1, 0, 0,  0, 0, 1]
+};
+
+let imuMount = 'z-up';
+let mountUserSet = false;
+let imuZero = null;
+let att = { roll: 0, pitch: 0, yaw: 0, t: null, ready: false };
+let relRoll = 0, relPitch = 0, relYaw = 0;
+let imuHz = 0;
+let poseToastTimer = null;
+
+function wrap180(d) {
+  return ((d + 180) % 360 + 360) % 360 - 180;
+}
+
+function angLerp(from, to, t) {
+  return from + wrap180(to - from) * t;
+}
+
+function remapVec(v, id) {
+  const m = IMU_MOUNTS[id] || IMU_MOUNTS['z-up'];
+  return [
+    m[0] * v[0] + m[1] * v[1] + m[2] * v[2],
+    m[3] * v[0] + m[4] * v[1] + m[5] * v[2],
+    m[6] * v[0] + m[7] * v[1] + m[8] * v[2]
+  ];
+}
+
+function loadImuPrefs() {
+  try {
+    const savedMount = localStorage.getItem('lidar-imu-mount');
+    if (savedMount && IMU_MOUNTS[savedMount]) {
+      imuMount = savedMount;
+      mountUserSet = true;
+      $('imu-mount').value = savedMount;
+    }
+    const savedZero = localStorage.getItem('lidar-imu-zero');
+    if (savedZero) imuZero = JSON.parse(savedZero);
+  } catch (err) { /* private mode or bad json */ }
+  updateZeroChip();
+}
+
+function updateZeroChip() {
+  const chip = $('imu-zero-chip');
+  if (imuZero) {
+    chip.textContent = 'Zeroed to start pose';
+    chip.classList.add('set');
+  } else {
+    chip.textContent = 'Absolute pose';
+    chip.classList.remove('set');
+  }
+}
+
+function flashPose(text) {
+  const el = $('pose-toast');
+  el.textContent = text;
+  el.style.display = 'block';
+  clearTimeout(poseToastTimer);
+  poseToastTimer = setTimeout(() => { el.style.display = 'none'; }, 2200);
+}
+
+function setStartPose() {
+  if (!att.ready) {
+    flashPose('Wait for a valid IMU sample');
+    return;
+  }
+  imuZero = { roll: att.roll, pitch: att.pitch, yaw: att.yaw };
+  try { localStorage.setItem('lidar-imu-zero', JSON.stringify(imuZero)); } catch (err) {}
+  relRoll = 0; relPitch = 0; relYaw = 0;
+  clearCloud();
+  updateZeroChip();
+  $('val-roll').textContent = '0.0°';
+  $('val-pitch').textContent = '0.0°';
+  $('val-yaw').textContent = '0.0°';
+  drawHorizon(0, 0);
+  flashPose('Start pose set — this orientation is 0°');
+  if (activeView === '3d' || activeView === 'radar') renderActiveView();
+}
+
+function showAttitude() {
+  $('val-roll').textContent = `${relRoll.toFixed(1)}°`;
+  $('val-pitch').textContent = `${relPitch.toFixed(1)}°`;
+  $('val-yaw').textContent = `${relYaw.toFixed(1)}°`;
+  $('imu-abs-readout').textContent =
+    `Sensor ${att.roll.toFixed(1)}° · ${att.pitch.toFixed(1)}° · ${wrap180(att.yaw).toFixed(1)}°`;
+  drawHorizon(relRoll, relPitch);
+}
+
+function clearStartPose() {
+  imuZero = null;
+  try { localStorage.removeItem('lidar-imu-zero'); } catch (err) {}
+  relRoll = att.roll;
+  relPitch = att.pitch;
+  relYaw = wrap180(att.yaw);
+  clearCloud();
+  updateZeroChip();
+  if (att.ready) showAttitude();
+  flashPose('Start pose cleared');
+  if (currentFrame) renderActiveView();
+}
+
+function resetAttitude() {
+  att = { roll: 0, pitch: 0, yaw: 0, t: null, ready: false };
+}
+
+function stepAttitude(accel, gyro, timestamp) {
+  const norm = Math.hypot(accel[0], accel[1], accel[2]);
+  const still = norm > 0.75 && norm < 1.25;
+  let dt = 0;
+  if (att.t != null && timestamp != null) {
+    dt = (timestamp - att.t) / 1000;
+    if (!(dt > 0 && dt < 0.25)) dt = 0;
+  }
+  att.t = timestamp;
+  if (dt && gyro) {
+    att.roll += gyro[0] * dt;
+    att.pitch += gyro[1] * dt;
+    att.yaw += gyro[2] * dt;
+  }
+  if (still) {
+    const aRoll = Math.atan2(accel[1], accel[2]) * 180 / Math.PI;
+    const aPitch = Math.atan2(-accel[0], Math.hypot(accel[1], accel[2])) * 180 / Math.PI;
+    if (!att.ready) {
+      att.roll = aRoll;
+      att.pitch = aPitch;
+      att.ready = true;
+    } else {
+      const trust = Math.abs(norm - 1) < 0.08 ? 0.12 : 0.04;
+      att.roll = angLerp(att.roll, aRoll, trust);
+      att.pitch = angLerp(att.pitch, aPitch, trust);
+    }
+  }
+  relRoll = imuZero ? wrap180(att.roll - imuZero.roll) : att.roll;
+  relPitch = imuZero ? wrap180(att.pitch - imuZero.pitch) : att.pitch;
+  relYaw = imuZero ? wrap180(att.yaw - imuZero.yaw) : wrap180(att.yaw);
+  return { norm, still };
+}
+
+function maybeDetectMount(rawAccel) {
+  if (mountUserSet) return;
+  const az = rawAccel[2];
+  if (Math.abs(az) < 0.7) return;
+  const next = az < 0 ? 'z-down' : 'z-up';
+  imuMount = next;
+  mountUserSet = true;
+  $('imu-mount').value = next;
+  try { localStorage.setItem('lidar-imu-mount', next); } catch (err) {}
+  resetAttitude();
+  if (next === 'z-down') flashPose('Hat detected flipped · Z down. Set start pose when it is level.');
+}
+
+function updateIMU(m) {
+  if (!m) return;
+  if (lastIMUSeq !== null && m.sequence === lastIMUSeq) return;
+  if (lastIMUSeq !== null && m.sequence < lastIMUSeq && lastIMUSeq - m.sequence < 5000) return;
+  if (lastIMUSeq !== null && m.sequence < lastIMUSeq) resetAttitude();
+  lastIMUSeq = m.sequence;
+  lastIMUTime = Date.now();
+
+  const fmt = (v, n) => (Number.isFinite(v) ? v.toFixed(n) : '—');
+  const rawA = m.accel_g || [0, 0, 0];
+  const rawG = m.gyro_dps || [0, 0, 0];
+  if (m.valid && m.accel_g) maybeDetectMount(m.accel_g);
+  const accel = m.valid && m.accel_g ? remapVec(rawA, imuMount) : rawA;
+  const gyro = m.valid && m.gyro_dps ? remapVec(rawG, imuMount) : rawG;
+  const ax = accel[0], ay = accel[1], az = accel[2];
+
+  $('val-ax').textContent = `${fmt(ax, 3)} g`;
+  $('val-ay').textContent = `${fmt(ay, 3)} g`;
+  $('val-az').textContent = `${fmt(az, 3)} g`;
+
+  function setBar(id, val, maxRange = 2.0) {
+    const bar = $(id);
+    const pct = Math.min(1, Math.abs(val) / maxRange) * 50;
+    if (val >= 0) {
+      bar.style.left = '50%';
+      bar.style.width = `${pct}%`;
+    } else {
+      bar.style.left = `${50 - pct}%`;
+      bar.style.width = `${pct}%`;
+    }
+  }
+  setBar('bar-ax', ax);
+  setBar('bar-ay', ay);
+  setBar('bar-az', az);
+
+  const gx = gyro[0], gy = gyro[1], gz = gyro[2];
+  $('val-gx').textContent = `${fmt(gx, 1)} °/s`;
+  $('val-gy').textContent = `${fmt(gy, 1)} °/s`;
+  $('val-gz').textContent = `${fmt(gz, 1)} °/s`;
+  setBar('bar-gx', gx, 250);
+  setBar('bar-gy', gy, 250);
+  setBar('bar-gz', gz, 250);
+
+  const norm = Math.hypot(ax, ay, az);
+  $('val-norm').textContent = m.valid ? `${norm.toFixed(3)} g` : '—';
+  $('val-temp').textContent = m.valid && m.temperature_c != null ? `${m.temperature_c.toFixed(1)} °C` : '—';
+
+  let motion = 'No fix';
+  if (m.valid) {
+    const step = stepAttitude(accel, gyro, m.timestamp_ms);
+    if (m.timestamp_ms != null && att.t != null) {
+      /* rate smoothed below from history */
+    }
+    const gmag = Math.hypot(gx, gy, gz);
+    motion = (!step.still || gmag > 12) ? 'Moving' : 'Still';
+    showAttitude();
+  }
+
+  if (m.valid) {
+    const sample = { timestamp_ms: m.timestamp_ms, accel_g: accel, gyro_dps: gyro };
+    imuHistory.push(sample);
+    imuHistory = imuHistory.filter(s => m.timestamp_ms - s.timestamp_ms < 8000);
+    if (imuHistory.length >= 2) {
+      const span = imuHistory.at(-1).timestamp_ms - imuHistory[0].timestamp_ms;
+      if (span > 200) imuHz = (imuHistory.length - 1) / (span / 1000);
+    }
+    drawPlot('plot-accel', 'accel_g', 2.0);
+    const peakGyro = Math.min(250, Math.max(20, Math.ceil(Math.max(...imuHistory.flatMap(s => s.gyro_dps.map(v => Math.abs(v)))) / 10) * 10));
+    $('gyro-plot-label').textContent = `Gyroscope · body frame (±${peakGyro} °/s)`;
+    drawPlot('plot-gyro', 'gyro_dps', peakGyro, true);
+    if (cloudLock && !cloudAccum && (activeView === '3d' || activeView === 'radar')) renderActiveView();
+  }
+
+  const hzText = imuHz ? `${imuHz.toFixed(0)} Hz` : '60 Hz';
+  $('imu-status-chip').textContent = m.valid ? `${hzText} · ${motion}` : 'IMU invalid';
+
+  $('diag-imu-raw').textContent =
+    `Sequence: ${m.sequence} · MCU Time: ${m.timestamp_ms} ms\n` +
+    `Hat: ${$('imu-mount').selectedOptions[0]?.textContent || imuMount}\n` +
+    `Body accel g: ${fmt(ax, 3)}, ${fmt(ay, 3)}, ${fmt(az, 3)}\n` +
+    `Body gyro dps: ${fmt(gx, 2)}, ${fmt(gy, 2)}, ${fmt(gz, 2)}\n` +
+    `Raw accel: ${m.raw?.accel?.join(', ')}\nRaw gyro: ${m.raw?.gyro?.join(', ')}\nRaw temp: ${m.raw?.temperature}`;
+}
+
+$('imu-mount').onchange = () => {
+  imuMount = $('imu-mount').value;
+  mountUserSet = true;
+  imuZero = null;
+  try {
+    localStorage.setItem('lidar-imu-mount', imuMount);
+    localStorage.removeItem('lidar-imu-zero');
+  } catch (err) {}
+  resetAttitude();
+  clearCloud();
+  updateZeroChip();
+  flashPose('Hat orientation applied — click Set start pose when it is level');
+};
+
+$('btn-imu-zero').onclick = () => setStartPose();
+$('btn-imu-clear-zero').onclick = () => clearStartPose();
+
+// --- Snapshot PNG Capture ---
+$('btn-snapshot').onclick = () => {
+  const exportCanvas = document.createElement('canvas');
+  exportCanvas.width = 1200;
+  exportCanvas.height = 900;
+  const ctx = exportCanvas.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#090d12';
+  ctx.fillRect(0, 0, 1200, 900);
+
+  // Header Banner
+  ctx.fillStyle = '#101620';
+  ctx.fillRect(0, 0, 1200, 70);
+  ctx.fillStyle = '#06b6d4';
+  ctx.font = 'bold 20px sans-serif';
+  ctx.fillText('VL53L9 ToF LiDAR Capture Snapshot', 30, 42);
+
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '13px monospace';
+  const ts = new Date().toISOString();
+  ctx.fillText(`Timestamp: ${ts}  |  Sequence: ${currentSeq || 0}  |  Boresight: ${$('stat-center').textContent}`, 550, 42);
+
+  // Render the current view canvas into snapshot
+  let srcCanvas = mapCanvas;
+  if (activeView === '3d') srcCanvas = $('viewport3d');
+  else if (activeView === 'radar') srcCanvas = radarCanvas;
+
+  ctx.drawImage(srcCanvas, 30, 90, 1140, 780);
+
+  // Download Trigger
+  const link = document.createElement('a');
+  link.download = `lidar-snapshot-seq${currentSeq || 0}-${Date.now()}.png`;
+  link.href = exportCanvas.toDataURL('image/png');
+  link.click();
+};
+
+// --- Keyboard Shortcuts & Toolbar Toggles ---
+$('btn-smooth').onclick = () => {
+  isSmoothFilter = !isSmoothFilter;
+  $('btn-smooth').classList.toggle('active', isSmoothFilter);
+  renderActiveView();
+};
+
+$('btn-reticle').onclick = () => {
+  showReticle = !showReticle;
+  $('btn-reticle').classList.toggle('active', showReticle);
+  $('reticle-overlay').style.display = (activeView === '2d' && showReticle) ? 'flex' : 'none';
+};
+
+$('channel-sel').onchange = () => { smoothScale = null; renderActiveView(); };
+$('colormap-sel').onchange = () => renderActiveView();
+$('scale-sel').onchange = () => { smoothScale = null; renderActiveView(); };
+$('slider-pt-size').oninput = () => renderActiveView();
+
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.code === 'Space') {
+    e.preventDefault();
+    $('btn-toggle').click();
+  } else if (e.key === '1') switchView('2d');
+  else if (e.key === '2') switchView('3d');
+  else if (e.key === '3') switchView('radar');
+  else if (e.key === 's' || e.key === 'S') $('btn-snapshot').click();
+  else if (e.key === 'z' || e.key === 'Z') setStartPose();
+  else if (e.key === 'c' || e.key === 'C') { clearCloud(); renderActiveView(); }
+});
+
+// --- Server-Sent Events (SSE) & Render Loop ---
+function renderFrame(s, forceDraw = true) {
+  if (s.session_id && currentSession !== s.session_id) {
+    currentSession = s.session_id;
+    currentSeq = null;
+    droppedGaps = 0;
+    imuHistory = [];
+    smoothScale = null;
+    resetAttitude();
+    clearCloud();
+  }
+  controlToken = s.control_token;
+  isStreaming = s.running;
+  currentError = s.error;
+
+  const btnToggle = $('btn-toggle');
+  btnToggle.disabled = false;
+  btnToggle.textContent = !isStreaming && currentError ? 'Retry' : isStreaming ? 'Pause' : 'Resume';
+
+  // Status Chip
+  const dot = $('state-dot');
+  const txt = $('state-text');
+  if (currentError) {
+    dot.className = 'status-dot error';
+    txt.textContent = s.message || 'Error';
+  } else if (!isStreaming) {
+    dot.className = 'status-dot warn';
+    txt.textContent = 'Paused';
+  } else {
+    dot.className = 'status-dot live';
+    txt.textContent = 'Streaming Live';
+  }
+
+  $('chip-fps').textContent = isStreaming && !currentError ? (s.host_fps || 0).toFixed(2) : '—';
+  $('chip-frames').textContent = s.frames_received || 0;
+  $('diag-rec').textContent = s.recoveries || 0;
+
+  if (s.frame && (currentSeq === null || s.frame.sequence !== currentSeq)) {
+    if (currentSeq !== null && s.frame.sequence > currentSeq + 1) {
+      droppedGaps += s.frame.sequence - currentSeq - 1;
+    }
+    currentFrame = s.frame;
+    currentSeq = currentFrame.sequence;
+    lastFrameTime = Date.now() - (s.age_seconds || 0) * 1000;
+
+    $('processing-note').textContent = (currentFrame.processing?.description || 'Raw data; calibration unavailable') + (currentFrame.processing?.calibrated ? (currentFrame.processing.temporal_filter ? ' · ST temporal filter ON' : ' · ST temporal filter OFF') : '');
+    $('processing-note').style.color = currentFrame.processing?.calibrated ? '#4ade80' : '#fbbf24';
+    $('chip-exp').textContent = `${currentFrame.capture_ms} ms`;
+    $('chip-port').textContent = currentFrame.usb_device ? currentFrame.usb_device.split('/').pop() : 'USB';
+    $('diag-seq').textContent = `${currentSeq} (Gaps: ${droppedGaps})`;
+    $('diag-chk').textContent = `${currentFrame.capture_ms} ms / ${currentFrame.checksum_ok ? 'PASS' : 'FAIL'}`;
+    $('diag-err').textContent = `0x${currentFrame.frame_error_flags.toString(16).padStart(2, '0')} (${currentFrame.sensor_warnings.join(', ') || 'None'})`;
+
+    if (forceDraw) renderActiveView();
+  }
+
+  if (s.imu) updateIMU(s.imu);
+}
+
+// Toggle Stream Action
+$('btn-toggle').onclick = async () => {
+  const path = isStreaming ? '/api/pause' : '/api/resume';
+  $('btn-toggle').disabled = true;
+  try {
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: { 'X-Control-Token': controlToken }
+    });
+    if (!res.ok) throw new Error('Control failed');
+    await pollAPI();
+  } catch (err) {
+    $('state-text').textContent = err.message;
+    $('state-dot').className = 'status-dot error';
+  } finally {
+    $('btn-toggle').disabled = false;
+  }
+};
+
+async function pollAPI() {
+  try {
+    const res = await fetch('/api/frame');
+    if (!res.ok) throw new Error();
+    renderFrame(await res.json(), false);
+  } catch {
+    $('state-text').textContent = 'Disconnected';
+    $('state-dot').className = 'status-dot error';
+    $('btn-toggle').disabled = true;
+  }
+}
+
+// SSE Connection
+const eventSource = new EventSource('/events');
+eventSource.onmessage = e => {
+  const data = JSON.parse(e.data);
+  if (data.kind === 'imu') {
+    updateIMU(data.imu);
+  } else if (data.display_gap) {
+    clearCloud();
+    pollAPI();
+  } else {
+    renderFrame(data);
+  }
+};
+
+eventSource.onerror = () => {
+  $('state-text').textContent = 'Reconnecting…';
+  $('state-dot').className = 'status-dot warn';
+};
+
+setInterval(() => {
+  if (isStreaming && !currentError && lastFrameTime && Date.now() - lastFrameTime > 2000) {
+    $('state-text').textContent = 'Waiting for fresh depth data';
+    $('state-dot').className = 'status-dot warn';
+    $('chip-fps').textContent = '—';
+  }
+}, 500);
+
+// 3D Auto-Orbit Animation Loop
+function animateLoop() {
+  if (autoRotate3D && activeView === '3d') {
+    orbitYaw += 0.006;
+    renderActiveView();
+  }
+  requestAnimationFrame(animateLoop);
+}
+
+// Start
+loadImuPrefs();
+initWebGL();
+pollAPI();
+animateLoop();
+drawHorizon(0, 0);
+updateColorbar('turbo');
+</script>
+</body>
+</html>

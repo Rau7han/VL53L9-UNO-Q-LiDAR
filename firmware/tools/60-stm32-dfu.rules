@@ -1,0 +1,4 @@
+# Install only if access is denied; see the team README. Replug after reloading rules.
+SUBSYSTEM=="usb", ATTR{idVendor}=="0483", ATTR{idProduct}=="df11", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+# Current firmware: TinyUSB CDC development VID/PID cafe:4010.
+SUBSYSTEM=="tty", ATTRS{idVendor}=="cafe", ATTRS{idProduct}=="4010", MODE="0660", GROUP="dialout", TAG+="uaccess"

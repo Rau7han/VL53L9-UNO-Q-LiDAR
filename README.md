@@ -1,36 +1,33 @@
-# USB-C LiDAR Node (VL53L9)
+# DIY 3D Depth Mapping with VL53L9CX and Arduino UNO Q
 
-![Status](https://img.shields.io/badge/status-Validation-yellow?style=for-the-badge)
+Companion source package for [the DIY Projects Labs tutorial](https://diyprojectslabs.com/3d-lidar-arduino-uno-q-vl53l9cx/).
+Original USB-LiDAR hardware: [RemiFM/USB-LiDAR-VL53L9](https://github.com/RemiFM/USB-LiDAR-VL53L9). This project adds firmware improvements, UNO Q integration and a native Python/GTK dashboard. Original copyright and third-party licenses are retained.
 
-<p align="center">
-  <img src="doc/render.png" alt="PCB render" width="40%">
-  <img src="doc/assembly.jpg" alt="Assembled USB-LiDAR-VL53L9 PCB" width="48%">
-</p>
+## Start here
 
-A compact and low-cost USB device with integrated LiDAR sensor and IMU. This hardware node packages STMicroelectronics' VL53L9 advanced direct Time-of-Flight (dToF) matrix LiDAR with a 6-axis IMU into a plug-and-play USB-C device. Designed for mobile robotics, micro-UAVs, and academic SLAM research. The hardware is designed in KiCad 10.
+1. Build the same PCB using `pcb/` and check its components and power rails.
+2. [Flash the LiDAR board](docs/FLASHING.md) using the supplied BIN or HEX.
+3. [Install and run on Arduino UNO Q](docs/UNO_Q_SETUP.md).
+4. To modify the code, follow [Build from source](docs/BUILD.md).
 
-## System Architecture
-![Block diagram showing VL53L9 LiDAR and LSM6DSV IMU connected via I3C to an STM32C55xx MCU, which interfaces to the host over USB Full-Speed](doc/block_diagram.png)
+**The firmware runs on the LiDAR PCB's STM32C552KEU6, not the UNO Q's onboard microcontroller.** UNO Q runs the Linux dashboard and receives data over USB. This is not an Arduino IDE sketch.
 
-| Feature | Detail | Datasheet |
-|---|---|---|
-| **LiDAR** | ST VL53L9CX dToF module with up to 54×42 (2.3 k) discrete ranging zones, 5 cm–8.8 m range | [link](https://www.st.com/resource/en/datasheet/vl53l9cx.pdf)
-| **IMU** | ST LSM6DSV 6-axis IMU with embedded sensor fusion engine, orientation quaternions generated on-chip | [link](https://www.st.com/resource/en/datasheet/lsm6dsv.pdf)
+## Included
 
-## Data Format
-Raw binary packet framing is used instead of verbose text formats (JSON/CSV) to stay well within the 12 Mbps USB Full-Speed ceiling while imposing zero processing overhead on the MCU.
+| Folder | Contents |
+|---|---|
+| `firmware/build/` | Ready-to-flash `.bin`, `.hex`, debugging `.elf` |
+| `firmware/cube/` | MCU application, generated configuration, HAL, linker files and flash loader |
+| `firmware/vendor/` | Sensor, IMU and USB stack source and licenses |
+| `dashboard/` | Python/GTK GUI, relay, ST processing C source, tests, native library prebuilts |
+| `uno-q/` | Prepared ARM dashboard and Python dependency snapshot used by the article |
+| `pcb/` | KiCad project, BOM and manufacturing files |
+| `docs/` | Setup, flashing, building and validation notes |
 
-Per the VL53L9CX datasheet (DS14879, Table 2), the I3C interface is specified for a 12.5 MHz bus clock and a 12.5 Mbps output data rate. Full resolution is hard-limited to 30 Hz. Two pre-configured profiles are available:
+The native dashboard provides 3D, Depth and Top views, confidence filtering, adjustable point size, reflectance estimates, optional triangulated surfaces, and relative IMU orientation. Up to 54 × 42 = 2,268 measured points are available per frame; invalid measurements remain absent. Surface interpolation does not add measured points. IMU yaw can drift; this is not SLAM.
 
-| Profile | Output Matrix | Frame Rate |
-|---|---|---|
-| **Full Resolution** *(default)* | 54 × 42 zones | 30 Hz |
-| **Binned Navigation** *(high-velocity)* | 24 × 20 zones | 60 Hz |
+The tested configuration received approximately 35–36 frames/s. This is not a guarantee of screen refresh rate, accuracy or end-to-end latency. ST's maximum sensor specifications do not all apply simultaneously to this setup. UNO Q VNC uses CPU rendering; the optional laptop viewer supports OpenGL.
 
-## Mechanical Specs
+Use only one viewer/relay at a time. The native GUI does not save captures. The retained legacy `raw_server.py` web application can record captures and is not the tutorial launcher.
 
-The PCB measures 34 × 30 mm and has 4× M3 mounting holes on a 20 mm square pitch, fitting small drone frame stacks.
-
-
-
-
+See [validation](docs/VALIDATION.md) and [third-party notices](THIRD_PARTY_NOTICES.md). Before flashing, check release checksums with `sha256sum -c SHA256SUMS` from the repository root.

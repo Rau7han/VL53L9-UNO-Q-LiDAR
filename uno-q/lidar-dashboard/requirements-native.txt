@@ -1,0 +1,4 @@
+# GTK3, PyGObject and Cairo are supplied by the Linux system packages.
+numpy
+pyserial==3.5
+PyOpenGL==3.1.10
