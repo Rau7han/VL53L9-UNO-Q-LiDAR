@@ -31,3 +31,11 @@ The tested configuration received approximately 35–36 frames/s. This is not a 
 Use only one viewer/relay at a time. The native GUI does not save captures. The retained legacy `raw_server.py` web application can record captures and is not the tutorial launcher.
 
 See [validation](docs/VALIDATION.md) and [third-party notices](THIRD_PARTY_NOTICES.md). Before flashing, check release checksums with `sha256sum -c SHA256SUMS` from the repository root.
+
+## Hardware and testing gallery
+
+![UNO Q USB LiDAR setup](docs/images/uno-q-usb-setup.jpg)
+
+![Tripod test setup](docs/images/lidar-tripod-test.jpg)
+
+See [all five project photos](docs/PHOTOS.md), including the USB connection, ST-Link wiring and assembled sensor board.
