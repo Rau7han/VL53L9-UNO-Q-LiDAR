@@ -21,3 +21,23 @@ Project photos supplied by DIY Projects Labs. These document the hardware setup,
 ## Assembled VL53L9CX LiDAR board
 
 ![Assembled VL53L9CX LiDAR board](images/lidar-board.jpg)
+
+# Live dashboard screenshots
+
+Screenshots from the working setup. The displayed FPS is the received frame rate, not display refresh rate or independently measured latency.
+
+## UNO Q native dashboard through VNC, using CPU rendering
+
+![UNO Q native dashboard through VNC, using CPU rendering](images/dashboard-uno-q-vnc.png)
+
+## Laptop OpenGL point cloud with live acquisition logs
+
+![Laptop OpenGL point cloud with live acquisition logs](images/dashboard-laptop-opengl.png)
+
+## Depth view with IMU readings
+
+![Depth view with IMU readings](images/dashboard-depth.png)
+
+## Top view of measured points
+
+![Top view of measured points](images/dashboard-top.png)

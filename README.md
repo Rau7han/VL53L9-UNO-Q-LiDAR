@@ -39,3 +39,13 @@ See [validation](docs/VALIDATION.md) and [third-party notices](THIRD_PARTY_NOTIC
 ![Tripod test setup](docs/images/lidar-tripod-test.jpg)
 
 See [all five project photos](docs/PHOTOS.md), including the USB connection, ST-Link wiring and assembled sensor board.
+
+## Live dashboard
+
+UNO Q native dashboard through VNC:
+
+![UNO Q live point cloud](docs/images/dashboard-uno-q-vnc.png)
+
+![Depth view and IMU](docs/images/dashboard-depth.png)
+
+[More screenshots: laptop OpenGL and Top view](docs/PHOTOS.md#live-dashboard-screenshots).
